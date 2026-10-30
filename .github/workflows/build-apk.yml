@@ -1,3 +1,4 @@
+
 name: Build CoC Overlay APK
 
 on:
@@ -15,6 +16,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Verify project archive
+        run: |
+          test -f CoCOverlayMVP-cloud-build.zip
+          unzip -l CoCOverlayMVP-cloud-build.zip | head -30
+
       - name: Extract Android project
         run: unzip -o CoCOverlayMVP-cloud-build.zip
 
@@ -27,13 +33,24 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
+      - name: Verify extracted project
+        run: |
+          test -f CoCOverlayMVP/settings.gradle.kts
+          test -f CoCOverlayMVP/app/build.gradle.kts
+          find CoCOverlayMVP -maxdepth 3 -type f | sort | head -60
+
       - name: Build debug APK
-        run: gradle -p CoCOverlayMVP assembleDebug
+        run: gradle -p CoCOverlayMVP assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
