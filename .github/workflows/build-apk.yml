@@ -3,8 +3,7 @@ name: Build CoC Overlay APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,25 +20,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify project archive
-        shell: bash
         run: |
           set -euxo pipefail
           test -f CoCOverlayMVP-cloud-build.zip
           unzip -t CoCOverlayMVP-cloud-build.zip
-          unzip -l CoCOverlayMVP-cloud-build.zip | head -40
 
       - name: Extract Android project
-        shell: bash
-        run: |
-          set -euxo pipefail
-          unzip -o CoCOverlayMVP-cloud-build.zip
-          echo "Top-level files:"
-          ls -la
-          echo "Gradle project files:"
-          find . -maxdepth 4 \
-            \( -name settings.gradle -o -name settings.gradle.kts \
-            -o -name build.gradle -o -name build.gradle.kts \
-            -o -name gradlew \) -print
+        run: unzip -o CoCOverlayMVP-cloud-build.zip
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -49,18 +36,22 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euxo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Locate Android project
         id: locate
         shell: bash
         run: |
           set -euo pipefail
-
           if [ -f "CoCOverlayMVP/settings.gradle.kts" ] || \
              [ -f "CoCOverlayMVP/settings.gradle" ]; then
             echo "project_dir=CoCOverlayMVP" >> "$GITHUB_OUTPUT"
@@ -68,7 +59,7 @@ jobs:
                [ -f "settings.gradle" ]; then
             echo "project_dir=." >> "$GITHUB_OUTPUT"
           else
-            echo "ERROR: Gradle settings file not found."
+            echo "Gradle settings file not found"
             find . -maxdepth 5 -type f | sort | head -200
             exit 1
           fi
@@ -79,7 +70,6 @@ jobs:
           gradle-version: '8.9'
 
       - name: Verify Gradle project
-        shell: bash
         env:
           PROJECT_DIR: ${{ steps.locate.outputs.project_dir }}
         run: |
@@ -89,7 +79,6 @@ jobs:
           gradle -p "$PROJECT_DIR" tasks --stacktrace
 
       - name: Build debug APK
-        shell: bash
         env:
           PROJECT_DIR: ${{ steps.locate.outputs.project_dir }}
         run: |
@@ -100,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CoCOverlayMVP-debug-apk
-          path: |
-            ${{ steps.locate.outputs.project_dir }}/app/build/outputs/apk/debug/*.apk
+          path: ${{ steps.locate.outputs.project_dir }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+          
